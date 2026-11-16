@@ -14,7 +14,7 @@ Windows 11 桌面图标美化小工具。WPF / .NET 8 编写，界面参考 Wind
 
 ## 下载
 
-到 [Releases](https://github.com/mingyu0401/windesk-mini/releases/latest) 下载 `WindeskMini11-v1.3.0.exe`，双击运行。
+到 [Releases](https://github.com/mingyu0401/windesk-mini/releases/latest) 下载最新的 `WindeskMini11-*.exe`，双击运行。
 
 单文件自包含，不需要预装 .NET。首次启动会请求管理员权限（要写系统注册表）。
 

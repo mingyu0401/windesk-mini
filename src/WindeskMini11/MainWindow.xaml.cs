@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using WindeskMini11.Services;
 using WindeskMini11.Views;
@@ -24,6 +25,7 @@ namespace WindeskMini11
         public MainWindow()
         {
             InitializeComponent();
+            ApplyWindowIcon();
 
             PageHost.Content = _personalizePage;
             VersionText.Text = "版本 " + (typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "1.0.0");
@@ -46,6 +48,37 @@ namespace WindeskMini11
 
             SourceInitialized += OnSourceInitialized;
             Closing += OnClosing;
+        }
+
+        /// <summary>
+        /// 标题栏 / 任务栏图标直接取 ico 里最大的一帧（256）。
+        /// 不设 Icon 时系统会拿 16×16 那一帧，在 150% 缩放下放大到 24 就发虚。
+        /// </summary>
+        private void ApplyWindowIcon()
+        {
+            try
+            {
+                var decoder = BitmapDecoder.Create(
+                    new Uri("pack://application:,,,/Assets/app.ico"),
+                    BitmapCreateOptions.None,
+                    BitmapCacheOption.OnLoad);
+
+                BitmapFrame? best = null;
+                foreach (var frame in decoder.Frames)
+                {
+                    if (best == null || frame.PixelWidth > best.PixelWidth) best = frame;
+                }
+
+                if (best != null)
+                {
+                    Icon = best;
+                    Log.Write("窗口图标: 使用 " + best.PixelWidth + "x" + best.PixelHeight + " 帧");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Write("设置窗口图标失败: " + ex.Message);
+            }
         }
 
         private void OnSourceInitialized(object? sender, EventArgs e)
