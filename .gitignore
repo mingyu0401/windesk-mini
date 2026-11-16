@@ -2,6 +2,7 @@
 bin/
 obj/
 dist/
+dist-lite/
 
 # 本地调试脚本与截图（图标生成、窗口截图、UIA 驱动等）
 build/

@@ -42,6 +42,35 @@
                     </Grid>
                 </Border>
 
+                <!-- 检查更新 -->
+                <Border Style="{StaticResource Card}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Style="{StaticResource IconTile}">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;"
+                                       Foreground="{DynamicResource IconTileFgBrush}" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1" Margin="14,0,16,0" VerticalAlignment="Center">
+                            <TextBlock Text="检查更新" Style="{StaticResource CardTitle}" />
+                            <TextBlock x:Name="UpdateStatus" Style="{StaticResource Desc}"
+                                       Text="从 GitHub Releases 获取最新版本号。" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button x:Name="OpenReleaseBtn" Content="打开发布页" Style="{StaticResource BtnSubtle}"
+                                    Margin="0,0,8,0" Visibility="Collapsed" Click="OpenReleaseBtn_Click" />
+                            <Button x:Name="CheckUpdateBtn" Content="检查" Style="{StaticResource BtnSecondary}"
+                                    Click="CheckUpdateBtn_Click" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
                 <TextBlock Text="功能" Style="{StaticResource SectionHeader}" Margin="4,18,0,10" />
 
                 <Border Style="{StaticResource Card}">

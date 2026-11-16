@@ -6,26 +6,46 @@
     <RootNamespace>WindeskMini11</RootNamespace>
     <AssemblyName>WindeskMini11</AssemblyName>
     <UseWPF>true</UseWPF>
-    <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>1.4.1</Version>
-    <AssemblyVersion>1.4.1.0</AssemblyVersion>
-    <FileVersion>1.4.1.0</FileVersion>
+    <Version>1.5.0</Version>
+    <AssemblyVersion>1.5.0.0</AssemblyVersion>
+    <FileVersion>1.5.0.0</FileVersion>
     <Product>Windesk Mini 桌面美化</Product>
     <AssemblyTitle>Windesk Mini 桌面美化</AssemblyTitle>
     <Company>Windesk</Company>
     <Description>Windows 11 桌面图标美化工具</Description>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
-    <!-- WPF 通过清单声明 PerMonitorV2，无需 WinForms 生成器接管 -->
-    <NoWarn>$(NoWarn);WFAC010</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <Resource Include="Assets\app.ico" />
   </ItemGroup>
+
+  <!--
+    WindowsDesktop 运行时包的 RuntimeList.xml 没有 Profile 标记，
+    自包含发布会把 WinForms 整套（约 23MB）一起拷进来，哪怕项目根本没引用。
+    托盘已经改成 Shell_NotifyIcon，这里把这批用不到的程序集从发布列表剔掉。
+  -->
+  <Target Name="TrimUnusedWindowsFormsAssemblies"
+          BeforeTargets="_ComputeFilesToBundle;CopyFilesToPublishDirectory">
+    <ItemGroup>
+      <_UnusedDesktopAssembly Include="@(ResolvedFileToPublish)"
+                              Condition="'%(Filename)' == 'System.Windows.Forms'
+                                         Or '%(Filename)' == 'System.Windows.Forms.Primitives'
+                                         Or '%(Filename)' == 'System.Windows.Forms.Design'
+                                         Or '%(Filename)' == 'System.Windows.Forms.Design.Editors'
+                                         Or '%(Filename)' == 'WindowsFormsIntegration'
+                                         Or '%(Filename)' == 'Microsoft.VisualBasic.Forms'
+                                         Or '%(Filename)' == 'Accessibility'
+                                         Or '%(Filename)' == 'PresentationFramework-SystemDrawing'" />
+      <ResolvedFileToPublish Remove="@(_UnusedDesktopAssembly)" />
+      <_FilesToBundle Remove="@(_FilesToBundle)" Condition="'%(Filename)' == 'System.Windows.Forms'" />
+    </ItemGroup>
+    <Message Importance="high" Text="裁剪 WinForms 程序集: @(_UnusedDesktopAssembly->Count()) 个" />
+  </Target>
 
 </Project>

@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Diagnostics;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using WindeskMini11.Services;
@@ -7,6 +9,10 @@ namespace WindeskMini11.Views
 {
     public partial class AboutPage : UserControl, IRefreshablePage
     {
+        private bool _checking;
+        private bool _autoChecked;
+        private string _releaseUrl = UpdateService.ReleasePageUrl;
+
         public AboutPage()
         {
             InitializeComponent();
@@ -14,13 +20,88 @@ namespace WindeskMini11.Views
 
             var version = typeof(AboutPage).Assembly.GetName().Version;
             VersionBadge.Text = version == null ? "v1.0.0" : "v" + version.ToString(3);
+            UpdateStatus.Text = "当前版本 v" + UpdateService.CurrentVersion + "，点右侧按钮检查是否有新版本。";
         }
 
         private IPageHost? Host => Window.GetWindow(this) as IPageHost;
 
         public void RefreshState()
         {
-            // 目前无需动态刷新的内容
+            // 第一次进入本页时静默查一次，失败也不打扰
+            if (_autoChecked || !IsLoaded) return;
+
+            _autoChecked = true;
+            _ = CheckUpdatesAsync(false);
+        }
+
+        // ===== 检查更新 =====
+
+        private async void CheckUpdateBtn_Click(object sender, RoutedEventArgs e)
+        {
+            await CheckUpdatesAsync(true);
+        }
+
+        private async Task CheckUpdatesAsync(bool manual)
+        {
+            if (_checking) return;
+
+            _checking = true;
+            CheckUpdateBtn.IsEnabled = false;
+            UpdateStatus.Text = "正在检查…";
+
+            try
+            {
+                var info = await UpdateService.CheckAsync();
+
+                if (!info.Succeeded)
+                {
+                    UpdateStatus.Text = "检查失败：" + info.Error;
+                    if (manual) Host?.ShowToast("检查更新失败：" + info.Error, false);
+                    return;
+                }
+
+                if (!string.IsNullOrEmpty(info.ReleaseUrl))
+                {
+                    _releaseUrl = info.ReleaseUrl;
+                }
+
+                if (info.IsNewer)
+                {
+                    UpdateStatus.Text = "发现新版本 " + info.LatestVersion +
+                                        "（当前 " + UpdateService.CurrentVersion + "）";
+                    OpenReleaseBtn.Visibility = Visibility.Visible;
+                    if (manual) Host?.ShowToast("有新版本 " + info.LatestVersion + " 可用");
+                }
+                else
+                {
+                    UpdateStatus.Text = "已是最新版本（" + UpdateService.CurrentVersion + "）";
+                    OpenReleaseBtn.Visibility = Visibility.Collapsed;
+                    if (manual) Host?.ShowToast("已是最新版本");
+                }
+            }
+            catch (Exception ex)
+            {
+                UpdateStatus.Text = "检查失败：" + ex.Message;
+                Log.Write("检查更新异常: " + ex.Message);
+            }
+            finally
+            {
+                _checking = false;
+                CheckUpdateBtn.IsEnabled = true;
+            }
+        }
+
+        private void OpenReleaseBtn_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(_releaseUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Log.Write("打开发布页失败: " + ex.Message);
+                Host?.ShowToast("打开浏览器失败", false);
+            }
         }
 
         private void ResetBtn_Click(object sender, RoutedEventArgs e)

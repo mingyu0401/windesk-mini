@@ -72,6 +72,14 @@ namespace WindeskMini11
                 return;
             }
 
+            // 诊断入口：检查更新（走真实 GitHub API）
+            if (args.Any(a => a.Equals("--diag-update", StringComparison.OrdinalIgnoreCase)))
+            {
+                RunUpdateDiagnostics();
+                Shutdown();
+                return;
+            }
+
             // 诊断入口：开机自启的创建 / 查询 / 删除（会自行清理干净）
             if (args.Any(a => a.Equals("--diag-autostart", StringComparison.OrdinalIgnoreCase)))
             {
@@ -338,6 +346,32 @@ namespace WindeskMini11
             }
         }
 
+        /// <summary>检查更新自检：请求 GitHub Releases 并解析版本。</summary>
+        private static void RunUpdateDiagnostics()
+        {
+            try
+            {
+                Log.Write("更新自检: 当前版本=" + UpdateService.CurrentVersion);
+
+                var info = UpdateService.CheckAsync().GetAwaiter().GetResult();
+
+                if (info.Succeeded)
+                {
+                    Log.Write("更新自检: 最新=" + info.LatestVersion +
+                              " 有新版=" + info.IsNewer +
+                              " 链接=" + info.ReleaseUrl);
+                }
+                else
+                {
+                    Log.Write("更新自检: 失败 " + info.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Write("更新自检失败: " + ex);
+            }
+        }
+
         /// <summary>开机自启自检：开启 → 查看方式 → 关闭，结束时不留残留。</summary>
         private static void RunAutoStartDiagnostics()
         {
@@ -476,21 +510,32 @@ namespace WindeskMini11
                 var structural = BlankIconFactory.IsBlank1Bpp(bytes);
                 Log.Write("图标自检: " + path + " 共 " + bytes.Length + " 字节, 1bpp结构校验=" + structural);
 
-                foreach (var size in new[] { 16, 32, 48 })
+                var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(
+                    new Uri(path, UriKind.Absolute),
+                    System.Windows.Media.Imaging.BitmapCreateOptions.None,
+                    System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+
+                foreach (var frame in decoder.Frames)
                 {
-                    using var icon = new System.Drawing.Icon(path, new System.Drawing.Size(size, size));
-                    using var bmp = icon.ToBitmap();
+                    var bitmap = new System.Windows.Media.Imaging.FormatConvertedBitmap(
+                        frame,
+                        System.Windows.Media.PixelFormats.Bgra32,
+                        null,
+                        0);
+
+                    var stride = bitmap.PixelWidth * 4;
+                    var pixels = new byte[stride * bitmap.PixelHeight];
+                    bitmap.CopyPixels(pixels, stride, 0);
+
                     var opaque = 0;
-                    for (var y = 0; y < bmp.Height; y++)
+                    for (var i = 3; i < pixels.Length; i += 4)
                     {
-                        for (var x = 0; x < bmp.Width; x++)
-                        {
-                            if (bmp.GetPixel(x, y).A != 0) opaque++;
-                        }
+                        if (pixels[i] != 0) opaque++;
                     }
 
-                    Log.Write("图标自检: " + size + "x" + size + " 加载成功, 不透明像素=" + opaque +
-                              " / " + (bmp.Width * bmp.Height));
+                    Log.Write("图标自检: " + bitmap.PixelWidth + "x" + bitmap.PixelHeight +
+                              " 解码成功, 不透明像素=" + opaque +
+                              " / " + (bitmap.PixelWidth * bitmap.PixelHeight));
                 }
 
                 Log.Write("图标自检: 完成");
