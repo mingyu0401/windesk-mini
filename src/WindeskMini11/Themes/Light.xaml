@@ -1,0 +1,69 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ===== 浅色主题（对齐 Windows 11 设置 · Light）===== -->
+
+    <LinearGradientBrush x:Key="WindowBgBrush" StartPoint="0,0" EndPoint="0.4,1">
+        <GradientStop Color="#F8F8F8" Offset="0" />
+        <GradientStop Color="#F0F0F0" Offset="1" />
+    </LinearGradientBrush>
+
+    <SolidColorBrush x:Key="CardBgBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="CardBgHoverBrush" Color="#FBFBFB" />
+    <SolidColorBrush x:Key="CardBorderBrush" Color="#E5E5E5" />
+    <SolidColorBrush x:Key="CardBorderHoverBrush" Color="#C7C7C7" />
+
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#1A1A1A" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#5A5A5A" />
+    <SolidColorBrush x:Key="TextTertiaryBrush" Color="#878787" />
+
+    <SolidColorBrush x:Key="AccentBrush" Color="#0067C0" />
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#0078D4" />
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="#005A9E" />
+    <SolidColorBrush x:Key="AccentFgBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="#E8F2FC" />
+    <SolidColorBrush x:Key="AccentSoftBorderBrush" Color="#C3DDF7" />
+
+    <SolidColorBrush x:Key="ControlBgBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="ControlBgHoverBrush" Color="#F5F5F5" />
+    <SolidColorBrush x:Key="ControlBgPressedBrush" Color="#EBEBEB" />
+    <SolidColorBrush x:Key="ControlBorderBrush" Color="#DBDBDB" />
+    <SolidColorBrush x:Key="ControlSelectedBgBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="ControlSelectedBorderBrush" Color="#B5B5B5" />
+
+    <SolidColorBrush x:Key="ToggleOffBgBrush" Color="#F2F2F2" />
+    <SolidColorBrush x:Key="ToggleOffBorderBrush" Color="#8C8C8C" />
+    <SolidColorBrush x:Key="ToggleKnobBrush" Color="#5C5C5C" />
+    <SolidColorBrush x:Key="ToggleKnobOnBrush" Color="#FFFFFF" />
+
+    <SolidColorBrush x:Key="DividerBrush" Color="#E2E2E2" />
+    <SolidColorBrush x:Key="NavSelectedBgBrush" Color="#E8E8E8" />
+    <SolidColorBrush x:Key="NavHoverBgBrush" Color="#EDEDED" />
+    <SolidColorBrush x:Key="NavGlyphBrush" Color="#4A4A4A" />
+
+    <SolidColorBrush x:Key="ScrollThumbBrush" Color="#B4B4B4" />
+    <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#8E8E8E" />
+
+    <SolidColorBrush x:Key="IconTileBgBrush" Color="#F1F1F1" />
+    <SolidColorBrush x:Key="IconTileFgBrush" Color="#2A2A2A" />
+
+    <SolidColorBrush x:Key="BadgeBgBrush" Color="#E8F2FC" />
+    <SolidColorBrush x:Key="BadgeFgBrush" Color="#0B5CA5" />
+    <SolidColorBrush x:Key="BadgeBorderBrush" Color="#C3DDF7" />
+
+    <SolidColorBrush x:Key="SuccessBrush" Color="#0F7B0F" />
+    <SolidColorBrush x:Key="DangerBrush" Color="#C42B1C" />
+
+    <SolidColorBrush x:Key="InfoBgBrush" Color="#F2F7FC" />
+    <SolidColorBrush x:Key="InfoBorderBrush" Color="#D8E6F3" />
+
+    <SolidColorBrush x:Key="ToastBgBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="ToastBorderBrush" Color="#D8D8D8" />
+
+    <SolidColorBrush x:Key="CodeBgBrush" Color="#F6F6F6" />
+    <SolidColorBrush x:Key="CodeBorderBrush" Color="#E2E2E2" />
+
+    <Color x:Key="TitleBarColor">#F3F3F3</Color>
+    <Color x:Key="TitleBarTextColor">#1A1A1A</Color>
+
+</ResourceDictionary>
