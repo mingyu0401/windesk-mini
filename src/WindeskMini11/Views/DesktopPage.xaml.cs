@@ -58,6 +58,7 @@ namespace WindeskMini11.Views
                     ? "点击「更改」后按下新的组合键，也支持单个按键（F7、右 Alt 等）；Esc 取消。"
                     : "快捷键已关闭，打开上方开关后才会生效。";
 
+                UpdateAutoStartHint();
                 UpdateIconState();
             }
             finally
@@ -298,14 +299,31 @@ namespace WindeskMini11.Views
             if (_suppress) return;
 
             var want = AutoStartToggle.IsChecked == true;
-            AutoStartService.SetEnabled(want);
+            var ok = AutoStartService.SetEnabled(want, out var message);
+
             AppCore.Config.AutoStart = AutoStartService.IsEnabled;
+            AppCore.Save();
 
             _suppress = true;
             AutoStartToggle.IsChecked = AppCore.Config.AutoStart;
             _suppress = false;
 
-            Host?.ShowToast(want ? "已设置为开机自动启动" : "已取消开机自动启动");
+            UpdateAutoStartHint();
+            Host?.ShowToast(message, ok && AppCore.Config.AutoStart == want);
+        }
+
+        /// <summary>按实际实现方式说明：计划任务免 UAC，Run 项会弹 UAC。</summary>
+        private void UpdateAutoStartHint()
+        {
+            AutoStartDesc.Text = AutoStartService.Current switch
+            {
+                AutoStartMethod.ScheduledTask =>
+                    "已通过计划任务启用：登录后以管理员身份静默启动到托盘，不弹 UAC。",
+                AutoStartMethod.RegistryRun =>
+                    "当前是注册表启动项，开机时会弹 UAC 确认。关掉再打开一次即可改成计划任务。",
+                _ =>
+                    "登录后自动静默启动到托盘。用计划任务以管理员身份运行，不会弹 UAC 确认框。"
+            };
         }
 
         // ===== 资源管理器 =====

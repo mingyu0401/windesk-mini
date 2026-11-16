@@ -228,8 +228,8 @@
 
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="开机自动启动" Style="{StaticResource CardTitle}" />
-                                <TextBlock Style="{StaticResource Desc}"
-                                           Text="登录后自动静默运行在托盘；由于需要写入系统注册表，启动时会请求管理员权限。" />
+                                <TextBlock x:Name="AutoStartDesc" Style="{StaticResource Desc}"
+                                           Text="登录后自动静默启动到托盘。用计划任务以管理员身份运行，不会弹 UAC 确认框。" />
                             </StackPanel>
 
                             <ToggleButton x:Name="AutoStartToggle" Grid.Column="1" Style="{StaticResource ToggleSwitch}"

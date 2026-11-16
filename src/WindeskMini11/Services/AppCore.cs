@@ -29,7 +29,12 @@ namespace WindeskMini11.Services
         {
             Config.RemoveShortcutArrow = ShellIconService.IsArrowRemoved();
             Config.RemoveShieldOverlay = ShellIconService.IsShieldRemoved();
-            Config.AutoStart = AutoStartService.IsEnabled;
+
+            // 以系统实际状态为准：计划任务 / 注册表启动项 / 都没开
+            Config.AutoStart = AutoStartService.Refresh();
+
+            // 已开启时按当前路径重建一遍任务，并把老版本的 Run 项升级掉
+            if (Config.AutoStart) AutoStartService.EnsureUpToDate();
 
             // 旧版本写入的是 32bpp 透明图标，Windows 不认，这里自愈成 1bpp
             ShellIconService.RepairIconFileIfNeeded();

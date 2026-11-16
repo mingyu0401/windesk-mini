@@ -72,6 +72,14 @@ namespace WindeskMini11
                 return;
             }
 
+            // 诊断入口：开机自启的创建 / 查询 / 删除（会自行清理干净）
+            if (args.Any(a => a.Equals("--diag-autostart", StringComparison.OrdinalIgnoreCase)))
+            {
+                RunAutoStartDiagnostics();
+                Shutdown();
+                return;
+            }
+
             // 诊断入口：离屏渲染悬浮提示（三个状态），检查排版与定位计算
             if (args.Any(a => a.Equals("--diag-osd", StringComparison.OrdinalIgnoreCase)))
             {
@@ -294,7 +302,7 @@ namespace WindeskMini11
                     var container = new System.Windows.Controls.Grid
                     {
                         Width = 808,
-                        Height = 760,
+                        Height = 900,
                         Background = Application.Current.TryFindResource("WindowBgBrush") as System.Windows.Media.Brush
                     };
 
@@ -307,11 +315,11 @@ namespace WindeskMini11
 
                     (pair.Item2 as IRefreshablePage)?.RefreshState();
 
-                    container.Measure(new System.Windows.Size(808, 760));
-                    container.Arrange(new System.Windows.Rect(0, 0, 808, 760));
+                    container.Measure(new System.Windows.Size(808, 900));
+                    container.Arrange(new System.Windows.Rect(0, 0, 808, 900));
                     container.UpdateLayout();
 
-                    var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(808, 760, 96, 96,
+                    var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(808, 900, 96, 96,
                         System.Windows.Media.PixelFormats.Pbgra32);
                     bitmap.Render(container);
 
@@ -327,6 +335,32 @@ namespace WindeskMini11
             catch (Exception ex)
             {
                 Log.Write("排版自检失败: " + ex);
+            }
+        }
+
+        /// <summary>开机自启自检：开启 → 查看方式 → 关闭，结束时不留残留。</summary>
+        private static void RunAutoStartDiagnostics()
+        {
+            try
+            {
+                var initial = AutoStartService.Refresh();
+                Log.Write("自启自检: 初始启用=" + initial +
+                          " 方式=" + AutoStartService.Current +
+                          " 管理员=" + AdminHelper.IsElevated());
+
+                var enableOk = AutoStartService.SetEnabled(true, out var enableMessage);
+                Log.Write("自启自检: 开启 => " + enableOk + " | " + enableMessage +
+                          " | 方式=" + AutoStartService.Current);
+
+                var disableOk = AutoStartService.SetEnabled(false, out var disableMessage);
+                Log.Write("自启自检: 关闭 => " + disableOk + " | " + disableMessage +
+                          " | 方式=" + AutoStartService.Current);
+
+                Log.Write("自启自检: 完成");
+            }
+            catch (Exception ex)
+            {
+                Log.Write("自启自检失败: " + ex);
             }
         }
 
