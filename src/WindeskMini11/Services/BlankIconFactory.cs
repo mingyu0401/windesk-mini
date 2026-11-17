@@ -5,11 +5,13 @@ using System.IO;
 namespace WindeskMini11.Services
 {
     /// <summary>
-    /// 生成"完全透明"的图标文件（用于 Shell Icons 覆盖槽）。
+    /// 生成“完全透明”的图标文件，供 Shell Icons 覆盖槽（29 小箭头 / 77 盾牌）使用。
     ///
-    /// 关键点：不能用 32bpp + Alpha=0 的图标。Windows 在绘制图标叠加层（箭头 29 / 盾牌 77）时
-    /// 并不总是遵循 Alpha 通道，32bpp 全透明图标可能被忽略或渲染成不透明黑块。
-    /// 安全做法是 1bpp 位图 + AND 掩码全 1：没有 Alpha 通道参与合成，"保持屏幕像素不变" 完全由掩码表达。
+    /// 实测教训（2026-11-17）：**1bpp + AND 掩码全 1** 的图标在部分渲染路径下会被当成
+    /// 不透明位图，桌面图标上会出现一整块黑色方块（覆盖层被按原尺寸画了上去）。
+    /// 32bpp + Alpha=0 才是各路径都尊重的写法：叠加层按 Alpha 合成，天然透明。
+    ///
+    /// 因此这里统一输出 32bpp；AND 掩码仍填全 1，兼容仍走旧式掩码合成的地方。
     /// </summary>
     public static class BlankIconFactory
     {
@@ -38,7 +40,7 @@ namespace WindeskMini11.Services
                 w.Write((byte)0);                // palette count
                 w.Write((byte)0);                // reserved
                 w.Write((ushort)1);              // planes
-                w.Write((ushort)1);              // bpp
+                w.Write((ushort)32);             // bpp
                 w.Write((uint)images[i].Length);
                 w.Write((uint)offset);
                 offset += images[i].Length;
@@ -52,8 +54,8 @@ namespace WindeskMini11.Services
         private static byte[] BuildImage(int size)
         {
             var rowBytes = (size + 31) / 32 * 4;
-            var xorSize = rowBytes * size;
-            var andSize = rowBytes * size;
+            var xorSize = size * size * 4;      // 32bpp：每像素 4 字节（BGRA）
+            var andSize = rowBytes * size;      // 掩码行按 4 字节对齐
 
             using var ms = new MemoryStream();
             using var w = new BinaryWriter(ms);
@@ -63,30 +65,26 @@ namespace WindeskMini11.Services
             w.Write(size);
             w.Write(size * 2);
             w.Write((ushort)1);
-            w.Write((ushort)1);                                   // 1bpp
-            w.Write(0u);                                           // BI_RGB
+            w.Write((ushort)32);                    // 32bpp
+            w.Write(0u);                            // BI_RGB
             w.Write((uint)(xorSize + andSize));
             w.Write(0);
             w.Write(0);
             w.Write(0u);
             w.Write(0u);
 
-            // 1bpp 调色板：黑、白（内容无关紧要，掩码全 1 时全部透明）
-            w.Write((byte)0); w.Write((byte)0); w.Write((byte)0); w.Write((byte)0);
-            w.Write((byte)255); w.Write((byte)255); w.Write((byte)255); w.Write((byte)0);
-
-            w.Write(new byte[xorSize]);                            // XOR 全 0
+            w.Write(new byte[xorSize]);             // 全 0 => BGRA 全 0，Alpha=0
 
             var mask = new byte[andSize];
-            for (var i = 0; i < mask.Length; i++) mask[i] = 0xFF;  // AND 全 1 => 透明
+            for (var i = 0; i < mask.Length; i++) mask[i] = 0xFF;  // AND 全 1 => 保持屏幕像素
             w.Write(mask);
 
             w.Flush();
             return ms.ToArray();
         }
 
-        /// <summary>结构校验：确认是 1bpp 且掩码全为 1（即真正透明）的 ICO。</summary>
-        public static bool IsBlank1Bpp(byte[] data)
+        /// <summary>结构校验：确认每个帧都是 32bpp、像素 Alpha 全 0、掩码全 1。</summary>
+        public static bool IsBlank32Bpp(byte[] data)
         {
             try
             {
@@ -103,20 +101,25 @@ namespace WindeskMini11.Services
 
                     var size = data[entry] == 0 ? 256 : data[entry];
                     var bpp = BitConverter.ToUInt16(data, entry + 6);
-                    if (bpp != 1) return false;
+                    if (bpp != 32) return false;
 
                     var bytes = (int)BitConverter.ToUInt32(data, entry + 8);
                     var offset = (int)BitConverter.ToUInt32(data, entry + 12);
                     if (offset <= 0 || bytes <= 0 || offset + bytes > data.Length) return false;
 
+                    var xorSize = size * size * 4;
                     var rowBytes = (size + 31) / 32 * 4;
-                    var xorSize = rowBytes * size;
                     var andSize = rowBytes * size;
 
-                    // 头部 40 + 调色板 8 + XOR + AND
-                    var maskStart = offset + 40 + 8 + xorSize;
-                    if (maskStart + andSize > data.Length) return false;
+                    if (40 + xorSize + andSize > bytes) return false;
 
+                    // 每个像素的第 4 字节是 Alpha，必须为 0
+                    for (var p = offset + 40 + 3; p < offset + 40 + xorSize; p += 4)
+                    {
+                        if (data[p] != 0) return false;
+                    }
+
+                    var maskStart = offset + 40 + xorSize;
                     for (var p = maskStart; p < maskStart + andSize; p++)
                     {
                         if (data[p] != 0xFF) return false;

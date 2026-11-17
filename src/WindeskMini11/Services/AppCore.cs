@@ -36,7 +36,7 @@ namespace WindeskMini11.Services
             // 已开启时按当前路径重建一遍任务，并把老版本的 Run 项升级掉
             if (Config.AutoStart) AutoStartService.EnsureUpToDate();
 
-            // 旧版本写入的是 32bpp 透明图标，Windows 不认，这里自愈成 1bpp
+            // 旧版本写入的是 1bpp 透明图标（叠加层会被画成黑块），这里自愈成 32bpp
             ShellIconService.RepairIconFileIfNeeded();
         }
 

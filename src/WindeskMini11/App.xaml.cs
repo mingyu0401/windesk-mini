@@ -550,13 +550,13 @@ namespace WindeskMini11
             {
                 var dir = System.IO.Path.Combine(AppConfig.Dir, "diag");
                 System.IO.Directory.CreateDirectory(dir);
-                var path = System.IO.Path.Combine(dir, "blank-1bpp.ico");
+                var path = System.IO.Path.Combine(dir, "blank-32bpp.ico");
 
                 var bytes = BlankIconFactory.Build();
                 System.IO.File.WriteAllBytes(path, bytes);
 
-                var structural = BlankIconFactory.IsBlank1Bpp(bytes);
-                Log.Write("图标自检: " + path + " 共 " + bytes.Length + " 字节, 1bpp结构校验=" + structural);
+                var structural = BlankIconFactory.IsBlank32Bpp(bytes);
+                Log.Write("图标自检: " + path + " 共 " + bytes.Length + " 字节, 32bpp结构校验=" + structural);
 
                 var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(
                     new Uri(path, UriKind.Absolute),

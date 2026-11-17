@@ -6,9 +6,11 @@ using Microsoft.Win32;
 namespace WindeskMini11.Services
 {
     /// <summary>
-    /// 通过 HKLM\...\Explorer\Shell Icons 覆盖系统图标槽位，实现“去箭头 / 去盾牌”。
+    /// 通过 Shell Icons 覆盖系统图标槽位，实现“去箭头 / 去盾牌”。
     /// 29 = 快捷方式链接覆盖图标（小箭头），77 = 用户账户控制覆盖图标（小盾牌）。
-    /// 两者都指向同一个 1bpp 全透明图标。
+    ///
+    /// 写入策略：同时写 HKLM（系统级，需管理员）与 HKCU（用户级，作为兜底）。
+    /// HKCU 优先级高于 HKLM，所以关闭时必须两边一起删，否则会残留用户级覆盖。
     /// </summary>
     public static class ShellIconService
     {
@@ -48,13 +50,13 @@ namespace WindeskMini11.Services
             }
         }
 
-        /// <summary>确保目标位置存在“1bpp 全透明”图标；旧格式会先备份再替换。</summary>
+        /// <summary>确保目标位置存在“32bpp 全透明”图标；旧格式（含 1bpp）会先备份再替换。</summary>
         private static void EnsureIconFile(string target)
         {
             if (File.Exists(target))
             {
                 var existing = File.ReadAllBytes(target);
-                if (BlankIconFactory.IsBlank1Bpp(existing))
+                if (BlankIconFactory.IsBlank32Bpp(existing))
                 {
                     return; // 已是可用格式
                 }
@@ -66,12 +68,12 @@ namespace WindeskMini11.Services
             File.WriteAllBytes(target, bytes);
 
             var check = File.ReadAllBytes(target);
-            if (!BlankIconFactory.IsBlank1Bpp(check))
+            if (!BlankIconFactory.IsBlank32Bpp(check))
             {
                 throw new InvalidOperationException("透明图标写入校验失败: " + target);
             }
 
-            Log.Write("已写入 1bpp 透明图标: " + target + " (" + check.Length + " 字节)");
+            Log.Write("已写入 32bpp 透明图标: " + target + " (" + check.Length + " 字节)");
         }
 
         private static void BackupExisting(string target)
@@ -119,7 +121,17 @@ namespace WindeskMini11.Services
 
                 EnsureIconFile(BlankIconPath);
 
-                // 旧版本把 77 指向 Blank.ico（32bpp），Windows 不认；迁移到系统透明图标
+                // 箭头槽位统一指向当前这份 32bpp 图标（老版本可能指向别处的同格式文件）
+                var arrowValue = ReadValue(ArrowValueName);
+                if (arrowRemoved
+                    && !string.IsNullOrWhiteSpace(arrowValue)
+                    && !arrowValue.Equals(BlankIconPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    SetOverlay(ArrowValueName, true, BlankIconPath);
+                    Log.Write("已校正箭头槽位: " + arrowValue + " -> " + BlankIconPath);
+                }
+
+                // 旧版本把 77 指向 Blank.ico，迁移到系统自带透明图标更稳
                 var current = ReadValue(ShieldValueName);
                 if (shieldRemoved
                     && !string.IsNullOrWhiteSpace(current)
@@ -150,12 +162,25 @@ namespace WindeskMini11.Services
         {
             try
             {
-                using var key = Registry.LocalMachine.OpenSubKey(KeyPath);
-                return key?.GetValue(name) as string;
+                using (var key = Registry.LocalMachine.OpenSubKey(KeyPath))
+                {
+                    if (key?.GetValue(name) is string machine && !string.IsNullOrWhiteSpace(machine))
+                        return machine;
+                }
             }
             catch (Exception ex)
             {
-                Log.Write("读取 Shell Icons 失败: " + ex.Message);
+                Log.Write("读取 HKLM Shell Icons 失败: " + ex.Message);
+            }
+
+            try
+            {
+                using var userKey = Registry.CurrentUser.OpenSubKey(PerUserKeyPath);
+                return userKey?.GetValue(name) as string;
+            }
+            catch (Exception ex)
+            {
+                Log.Write("读取 HKCU Shell Icons 失败: " + ex.Message);
                 return null;
             }
         }
@@ -172,30 +197,48 @@ namespace WindeskMini11.Services
 
         private static void SetOverlay(string valueName, bool removed, string iconValue)
         {
-            using var key = Registry.LocalMachine.CreateSubKey(KeyPath, true)
-                            ?? throw new InvalidOperationException("无法写入系统注册表（需要管理员权限）");
+            var machineOk = false;
+            var userOk = false;
 
-            if (removed)
-            {
-                key.SetValue(valueName, iconValue, RegistryValueKind.String);
-                Log.Write("设置 Shell Icons\\" + valueName + " = " + iconValue);
-            }
-            else
-            {
-                key.DeleteValue(valueName, false);
-                Log.Write("删除 Shell Icons\\" + valueName);
-            }
-
-            // 清理用户级同名覆盖，避免与系统级设置冲突
             try
             {
-                using var userKey = Registry.CurrentUser.OpenSubKey(PerUserKeyPath, true);
-                userKey?.DeleteValue(valueName, false);
+                using var key = Registry.LocalMachine.CreateSubKey(KeyPath, true);
+                if (key != null)
+                {
+                    if (removed) key.SetValue(valueName, iconValue, RegistryValueKind.String);
+                    else key.DeleteValue(valueName, false);
+                    machineOk = true;
+                }
             }
             catch (Exception ex)
             {
-                Log.Write("清理 HKCU 覆盖失败: " + ex.Message);
+                Log.Write("写入 HKLM Shell Icons\\" + valueName + " 失败: " + ex.Message);
             }
+
+            try
+            {
+                using var userKey = Registry.CurrentUser.CreateSubKey(PerUserKeyPath, true);
+                if (userKey != null)
+                {
+                    if (removed) userKey.SetValue(valueName, iconValue, RegistryValueKind.String);
+                    else userKey.DeleteValue(valueName, false);
+                    userOk = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Write("写入 HKCU Shell Icons\\" + valueName + " 失败: " + ex.Message);
+            }
+
+            if (!machineOk && !userOk)
+            {
+                throw new InvalidOperationException("无法写入注册表（系统级与用户级都失败）");
+            }
+
+            Log.Write((removed ? "设置" : "删除") + " Shell Icons\\" + valueName +
+                      (machineOk ? " [HKLM]" : string.Empty) +
+                      (userOk ? " [HKCU]" : string.Empty) +
+                      (removed ? " = " + iconValue : string.Empty));
 
             NotifyShell();
         }
