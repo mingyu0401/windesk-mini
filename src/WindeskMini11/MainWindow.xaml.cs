@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -20,7 +21,24 @@ namespace WindeskMini11
         private readonly DesktopPage _desktopPage = new DesktopPage();
         private readonly AboutPage _aboutPage = new AboutPage();
         private readonly DispatcherTimer _toastTimer;
+        private readonly DispatcherTimer _healthTimer;
+        private HwndSource? _sessionSource;
         private bool _reallyExit;
+
+        // 睡眠唤醒 / 会话切换后，系统的低级键盘钩子可能被丢掉，靠这两个消息补救
+        private const int WM_POWERBROADCAST = 0x0218;
+        private const int WM_WTSSESSION_CHANGE = 0x02B1;
+        private const int PBT_APMRESUMESUSPEND = 0x0007;
+        private const int PBT_APMRESUMEAUTOMATIC = 0x0012;
+        private const int WTS_CONSOLE_CONNECT = 0x0001;
+        private const int WTS_SESSION_UNLOCK = 0x0008;
+        private const int NOTIFY_FOR_THIS_SESSION = 0;
+
+        [DllImport("wtsapi32.dll", SetLastError = true)]
+        private static extern bool WTSRegisterSessionNotification(IntPtr hWnd, int dwFlags);
+
+        [DllImport("wtsapi32.dll", SetLastError = true)]
+        private static extern bool WTSUnRegisterSessionNotification(IntPtr hWnd);
 
         public MainWindow()
         {
@@ -45,6 +63,11 @@ namespace WindeskMini11
                 _toastTimer.Stop();
                 HideToast();
             };
+
+            // 兜底自检：钩子该在却不在时补装
+            _healthTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(2) };
+            _healthTimer.Tick += (_, _) => AppCore.Keys.HealthCheck();
+            _healthTimer.Start();
 
             SourceInitialized += OnSourceInitialized;
             Closing += OnClosing;
@@ -88,6 +111,60 @@ namespace WindeskMini11
             AppCore.Hotkey.Pressed += OnHotkeyPressed;
             RegisterHotkeyInternal();
             ThemeManager.ApplyTitleBar(this);
+
+            var handle = new WindowInteropHelper(this).Handle;
+            _sessionSource = HwndSource.FromHwnd(handle);
+            _sessionSource?.AddHook(SessionProc);
+
+            if (WTSRegisterSessionNotification(handle, NOTIFY_FOR_THIS_SESSION))
+            {
+                Log.Write("已订阅会话通知（锁屏 / 切换用户）");
+            }
+            else
+            {
+                Log.Write("订阅会话通知失败: " + Marshal.GetLastWin32Error());
+            }
+        }
+
+        /// <summary>睡眠唤醒、解锁后重新装一次按键监听。</summary>
+        private IntPtr SessionProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == WM_POWERBROADCAST)
+            {
+                var evt = wParam.ToInt32();
+                if (evt == PBT_APMRESUMEAUTOMATIC || evt == PBT_APMRESUMESUSPEND)
+                {
+                    Log.Write("系统从睡眠恢复，重装按键监听");
+                    ReapplyHotkey();
+                }
+            }
+            else if (msg == WM_WTSSESSION_CHANGE)
+            {
+                var evt = wParam.ToInt32();
+                if (evt == WTS_SESSION_UNLOCK || evt == WTS_CONSOLE_CONNECT)
+                {
+                    Log.Write("会话解锁，重装按键监听");
+                    ReapplyHotkey();
+                }
+            }
+
+            return IntPtr.Zero;
+        }
+
+        private void ReapplyHotkey()
+        {
+            if (!AppCore.Config.HotkeyEnabled) return;
+
+            if (HotkeyDefinition.TryParse(AppCore.Config.Hotkey, out _, out var vk) &&
+                HotkeyDefinition.IsModifierOnly(vk))
+            {
+                AppCore.Keys.ReinstallHook();
+            }
+            else
+            {
+                // 组合键走 RegisterHotKey，唤醒后重注册一次更稳妥
+                AppCore.Hotkey.Register(AppCore.Config.Hotkey);
+            }
         }
 
         private void RegisterHotkeyInternal()
@@ -285,6 +362,15 @@ namespace WindeskMini11
             {
                 AppCore.Hotkey.Pressed -= OnHotkeyPressed;
                 AppCore.Hotkey.Dispose();
+                _healthTimer.Stop();
+
+                if (_sessionSource != null)
+                {
+                    WTSUnRegisterSessionNotification(new WindowInteropHelper(this).Handle);
+                    _sessionSource.RemoveHook(SessionProc);
+                    _sessionSource = null;
+                }
+
                 OsdService.Close();
                 DesktopService.EnsureIconsVisible();
                 AppCore.Tray?.Dispose();

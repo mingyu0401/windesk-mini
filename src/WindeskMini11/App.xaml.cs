@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -69,6 +70,15 @@ namespace WindeskMini11
             if (args.Any(a => a.Equals("--diag-hook", StringComparison.OrdinalIgnoreCase)))
             {
                 RunHookCaptureDiagnostics();
+                return;
+            }
+
+            // 诊断入口：模拟睡眠唤醒，验证键盘钩子会被重装
+            if (args.Any(a => a.Equals("--diag-resume", StringComparison.OrdinalIgnoreCase)))
+            {
+                AppCore.Init();
+                ThemeManager.Apply(AppCore.Config.Theme);
+                RunResumeDiagnostics();
                 return;
             }
 
@@ -343,6 +353,44 @@ namespace WindeskMini11
             catch (Exception ex)
             {
                 Log.Write("排版自检失败: " + ex);
+            }
+        }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        /// <summary>
+        /// 模拟收到 WM_POWERBROADCAST(PBT_APMRESUMEAUTOMATIC)，
+        /// 验证"唤醒 → 重装键盘钩子"这条链路。
+        /// </summary>
+        private static void RunResumeDiagnostics()
+        {
+            const uint WM_POWERBROADCAST = 0x0218;
+            const int PBT_APMRESUMEAUTOMATIC = 0x0012;
+
+            try
+            {
+                var window = new MainWindow();
+                var handle = new WindowInteropHelper(window).EnsureHandle();
+                Log.Write("会话自检: 窗口句柄=" + handle + " 钩子=" + AppCore.Keys.IsHooked);
+
+                var posted = PostMessage(handle, WM_POWERBROADCAST,
+                    new IntPtr(PBT_APMRESUMEAUTOMATIC), IntPtr.Zero);
+                Log.Write("会话自检: 投递唤醒消息=" + posted);
+
+                var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
+                timer.Tick += (_, _) =>
+                {
+                    timer.Stop();
+                    Log.Write("会话自检: 完成，钩子=" + AppCore.Keys.IsHooked);
+                    Environment.Exit(0);
+                };
+                timer.Start();
+            }
+            catch (Exception ex)
+            {
+                Log.Write("会话自检失败: " + ex);
+                Environment.Exit(1);
             }
         }
 

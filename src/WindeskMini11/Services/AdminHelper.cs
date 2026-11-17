@@ -202,31 +202,17 @@ namespace WindeskMini11.Services
 
             var action = "\"" + exe + "\" --tray";
 
+            // 不带 /DELAY：登录即启动，热键立刻可用。
+            // 万一托盘图标因为 explorer 还没起来而添加失败，TaskbarCreated 广播会自动补上。
             var code = RunSchtasks(out var output,
                 "/Create",
                 "/TN", TaskName,
                 "/TR", action,
                 "/SC", "ONLOGON",
-                "/DELAY", "0001:00",
                 "/RL", "HIGHEST",
                 "/F");
 
             if (code == 0) return true;
-
-            // 个别系统不接受 /DELAY（登录后延迟 1 分钟），去掉再试一次
-            code = RunSchtasks(out output,
-                "/Create",
-                "/TN", TaskName,
-                "/TR", action,
-                "/SC", "ONLOGON",
-                "/RL", "HIGHEST",
-                "/F");
-
-            if (code == 0)
-            {
-                Log.Write("开机自启: 任务已创建（本系统不支持 /DELAY，改为登录即启动）");
-                return true;
-            }
 
             error = "schtasks 返回 " + code +
                     (AdminHelper.IsElevated() ? string.Empty : "（缺少管理员权限）");

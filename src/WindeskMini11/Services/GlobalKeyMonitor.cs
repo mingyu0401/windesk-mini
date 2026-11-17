@@ -109,6 +109,37 @@ namespace WindeskMini11.Services
             ReleaseIfIdle();
         }
 
+        /// <summary>
+        /// 重新安装钩子。睡眠唤醒 / 锁屏解锁 / 会话切换后，系统可能把低级键盘钩子丢掉，
+        /// 表现为"进程还在、热键不响应"，重装一次就好。
+        /// </summary>
+        public void ReinstallHook()
+        {
+            if (!_capturing && _watchVk == 0) return;
+
+            if (_hook != IntPtr.Zero)
+            {
+                UnhookWindowsHookEx(_hook);
+                _hook = IntPtr.Zero;
+            }
+
+            _pressed.Clear();
+            _pendingModifier = 0;
+            _cancelPending = false;
+
+            EnsureHook();
+            Log.Write("键盘钩子重装: " + (IsHooked ? "成功" : "失败"));
+        }
+
+        /// <summary>定时自检：该有钩子却没有时补装。</summary>
+        public void HealthCheck()
+        {
+            if (_capturing || _watchVk != 0)
+            {
+                if (_hook == IntPtr.Zero) EnsureHook();
+            }
+        }
+
         // ===== 钩子生命周期 =====
 
         private void EnsureHook()
