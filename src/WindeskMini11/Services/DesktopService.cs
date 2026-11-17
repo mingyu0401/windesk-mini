@@ -130,8 +130,7 @@ namespace WindeskMini11.Services
             var wasHidden = !IconsVisible;
             try
             {
-                KillExplorer();
-                await Task.Delay(600);
+                await StopExplorerAsync();
                 await EnsureExplorerRunningAsync();
 
                 await WaitForDesktopAsync(wasHidden);
@@ -149,15 +148,30 @@ namespace WindeskMini11.Services
             var wasHidden = !IconsVisible;
             try
             {
-                KillExplorer();
-                await Task.Delay(900);
+                // 必须等 explorer 真正退出再删，否则文件仍被占用：
+                // 删不掉时缓存会被半途重写，桌面图标就会串成别的程序的图标。
+                await StopExplorerAsync();
+
+                var existed = 0;
+                var deleted = 0;
 
                 foreach (var file in CollectIconCacheFiles())
                 {
+                    existed++;
                     try
                     {
+                        File.SetAttributes(file, FileAttributes.Normal);
                         File.Delete(file);
-                        Log.Write("已删除图标缓存: " + file);
+
+                        if (!File.Exists(file))
+                        {
+                            deleted++;
+                            Log.Write("已删除图标缓存: " + file);
+                        }
+                        else
+                        {
+                            Log.Write("图标缓存仍存在（未真正删除）: " + file);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -165,19 +179,54 @@ namespace WindeskMini11.Services
                     }
                 }
 
+                Log.Write("图标缓存清理结果: " + deleted + "/" + existed);
+
                 if (Process.GetProcessesByName("explorer").Length == 0)
                 {
                     await EnsureExplorerRunningAsync();
                 }
 
                 await WaitForDesktopAsync(wasHidden);
-                return true;
+
+                // 有文件没删掉就不要谎报成功，让上层提示用户
+                return existed == 0 || deleted == existed;
             }
             catch (Exception ex)
             {
                 Log.Write("清理图标缓存失败: " + ex);
                 return false;
             }
+        }
+
+        /// <summary>循环结束 explorer，直到进程真正归零（系统可能自动拉起）。</summary>
+        private static async Task StopExplorerAsync()
+        {
+            for (var attempt = 0; attempt < 12; attempt++)
+            {
+                var procs = Process.GetProcessesByName("explorer");
+                if (procs.Length == 0) return;
+
+                foreach (var p in procs)
+                {
+                    try
+                    {
+                        p.Kill(true);
+                        p.WaitForExit(1500);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Write("结束 explorer 失败: " + ex.Message);
+                    }
+                    finally
+                    {
+                        p.Dispose();
+                    }
+                }
+
+                await Task.Delay(250);
+            }
+
+            Log.Write("结束 explorer 超时，剩余 " + Process.GetProcessesByName("explorer").Length + " 个");
         }
 
         private static IEnumerable<string> CollectIconCacheFiles()
@@ -196,21 +245,6 @@ namespace WindeskMini11.Services
             }
 
             return list;
-        }
-
-        private static void KillExplorer()
-        {
-            foreach (var p in Process.GetProcessesByName("explorer"))
-            {
-                try
-                {
-                    p.Kill();
-                }
-                catch (Exception ex)
-                {
-                    Log.Write("结束 explorer 失败: " + ex.Message);
-                }
-            }
         }
 
         private static async Task<bool> EnsureExplorerRunningAsync()
