@@ -39,16 +39,19 @@ Windows 10 / 11，x64。
 ## 构建
 
 ```bash
-cd src/WindeskMini11
-
-# 标准版：自包含单文件
-dotnet publish -c Release -r win-x64 --self-contained true \
+# 在项目根目录执行：先发布到临时目录，再覆盖固定文件名
+# 标准版：自包含单文件 -> dist/WindeskMini11.exe
+dotnet publish src/WindeskMini11/WindeskMini11.csproj -c Release -r win-x64 --self-contained true \
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
-  -p:EnableCompressionInSingleFile=true -o ../../dist
+  -p:EnableCompressionInSingleFile=true -p:DebugType=None \
+  -p:PublishDir=build/publish-standard/
+cp -f build/publish-standard/WindeskMini11.exe dist/WindeskMini11.exe
 
-# 精简版：依赖 .NET 8 桌面运行时
-dotnet publish -c Release -r win-x64 --self-contained false \
-  -p:PublishSingleFile=true -o ../../dist-lite
+# 精简版：依赖 .NET 8 桌面运行时 -> dist/WindeskMini11-lite.exe
+dotnet publish src/WindeskMini11/WindeskMini11.csproj -c Release -r win-x64 --self-contained false \
+  -p:PublishSingleFile=true -p:DebugType=None \
+  -p:PublishDir=build/publish-lite/
+cp -f build/publish-lite/WindeskMini11.exe dist/WindeskMini11-lite.exe
 ```
 
 ### 关于体积

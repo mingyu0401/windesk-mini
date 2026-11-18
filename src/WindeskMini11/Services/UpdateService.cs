@@ -20,6 +20,9 @@ namespace WindeskMini11.Services
 
         /// <summary>最新版本是否比当前程序新。</summary>
         public bool IsNewer { get; set; }
+
+        /// <summary>当前程序是否比公开的最新 Release 更新。</summary>
+        public bool IsCurrentNewer { get; set; }
     }
 
     /// <summary>从 GitHub Releases 读取最新版本。</summary>
@@ -80,7 +83,8 @@ namespace WindeskMini11.Services
                 using var document = JsonDocument.Parse(json);
                 var root = document.RootElement;
 
-                var tag = GetString(root, "tag_name").TrimStart('v', 'V');
+                var rawTag = GetString(root, "tag_name").Trim();
+                var tag = NormalizeVersion(rawTag);
                 if (string.IsNullOrEmpty(tag))
                 {
                     result.Error = "无法解析版本号";
@@ -90,9 +94,12 @@ namespace WindeskMini11.Services
                 result.LatestVersion = tag;
                 result.ReleaseUrl = GetString(root, "html_url");
                 result.Succeeded = true;
-                result.IsNewer = CompareVersions(tag, CurrentVersion) > 0;
+                var comparison = CompareVersions(tag, CurrentVersion);
+                result.IsNewer = comparison > 0;
+                result.IsCurrentNewer = comparison < 0;
 
-                Log.Write("检查更新: 当前=" + CurrentVersion + " 最新=" + tag + " 有新版=" + result.IsNewer);
+                Log.Write("检查更新: 当前=" + CurrentVersion + " 最新=" + tag +
+                          " 有新版=" + result.IsNewer + " 当前较新=" + result.IsCurrentNewer);
             }
             catch (TaskCanceledException)
             {
@@ -114,10 +121,25 @@ namespace WindeskMini11.Services
                 : string.Empty;
         }
 
+        /// <summary>兼容 v1.5.3、1.5.3、release-1.5.3 等标签格式。</summary>
+        private static string NormalizeVersion(string value)
+        {
+            var text = value.Trim();
+            while (text.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+                text = text.Substring(1).TrimStart();
+
+            var marker = text.IndexOfAny(new[] { '-', '+', ' ' });
+            if (marker >= 0) text = text.Substring(0, marker);
+
+            return Version.TryParse(text, out var version) ? version.ToString(3) : string.Empty;
+        }
+
         /// <summary>逐段比较版本号，a &gt; b 返回正数。</summary>
         private static int CompareVersions(string a, string b)
         {
-            if (Version.TryParse(a, out var left) && Version.TryParse(b, out var right))
+            var leftText = NormalizeVersion(a);
+            var rightText = NormalizeVersion(b);
+            if (Version.TryParse(leftText, out var left) && Version.TryParse(rightText, out var right))
             {
                 return left.CompareTo(right);
             }

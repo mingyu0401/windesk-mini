@@ -96,10 +96,11 @@ namespace WindeskMini11.Services
         }
 
         /// <summary>
-        /// 盾牌槽位使用的透明图标。优先用系统自带的透明图标资源 shell32.dll,50
-        /// （实测 16/32/48 三种尺寸均为 0 个不透明像素），不依赖磁盘上的自定义文件。
+        /// 覆盖槽位使用的透明图标。箭头和盾牌都统一使用系统自带资源 shell32.dll,50。
+        /// 自定义 ICO 在部分 Windows 11 Explorer 启动路径中会被按黑底绘制，导致整块黑方块；
+        /// 系统资源不依赖自定义 ICO，也不会在开机重建图标缓存时变黑。
         /// </summary>
-        public static string ShieldIconValue
+        public static string OverlayIconValue
         {
             get
             {
@@ -109,6 +110,8 @@ namespace WindeskMini11.Services
                 return File.Exists(shell32) ? shell32 + ",50" : BlankIconPath;
             }
         }
+
+        public static string ShieldIconValue => OverlayIconValue;
 
         /// <summary>启动时自愈：修正旧版本写入的不可用图标（32bpp 透明图标在叠加槽里不生效）。</summary>
         public static void RepairIconFileIfNeeded()
@@ -121,25 +124,24 @@ namespace WindeskMini11.Services
 
                 EnsureIconFile(BlankIconPath);
 
-                // 箭头槽位统一指向当前这份 32bpp 图标（老版本可能指向别处的同格式文件）
+                // 箭头槽位也统一指向系统透明资源，避免自定义 ICO 在 Explorer 启动时变黑。
                 var arrowValue = ReadValue(ArrowValueName);
                 if (arrowRemoved
                     && !string.IsNullOrWhiteSpace(arrowValue)
-                    && !arrowValue.Equals(BlankIconPath, StringComparison.OrdinalIgnoreCase))
+                    && !arrowValue.Equals(OverlayIconValue, StringComparison.OrdinalIgnoreCase))
                 {
-                    SetOverlay(ArrowValueName, true, BlankIconPath);
-                    Log.Write("已校正箭头槽位: " + arrowValue + " -> " + BlankIconPath);
+                    SetOverlay(ArrowValueName, true, OverlayIconValue);
+                    Log.Write("已校正箭头槽位: " + arrowValue + " -> " + OverlayIconValue);
                 }
 
                 // 旧版本把 77 指向 Blank.ico，迁移到系统自带透明图标更稳
                 var current = ReadValue(ShieldValueName);
                 if (shieldRemoved
                     && !string.IsNullOrWhiteSpace(current)
-                    && current.EndsWith("Blank.ico", StringComparison.OrdinalIgnoreCase)
-                    && !current.Equals(ShieldIconValue, StringComparison.OrdinalIgnoreCase))
+                    && !current.Equals(OverlayIconValue, StringComparison.OrdinalIgnoreCase))
                 {
-                    SetOverlay(ShieldValueName, true, ShieldIconValue);
-                    Log.Write("已迁移盾牌槽位: " + current + " -> " + ShieldIconValue);
+                    SetOverlay(ShieldValueName, true, OverlayIconValue);
+                    Log.Write("已校正盾牌槽位: " + current + " -> " + OverlayIconValue);
                 }
             }
             catch (Exception ex)
@@ -187,7 +189,7 @@ namespace WindeskMini11.Services
 
         public static void SetArrowRemoved(bool removed)
         {
-            SetOverlay(ArrowValueName, removed, BlankIconPath);
+            SetOverlay(ArrowValueName, removed, OverlayIconValue);
         }
 
         public static void SetShieldRemoved(bool removed)

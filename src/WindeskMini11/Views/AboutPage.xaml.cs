@@ -72,6 +72,14 @@ namespace WindeskMini11.Views
                     OpenReleaseBtn.Visibility = Visibility.Visible;
                     if (manual) Host?.ShowToast("有新版本 " + info.LatestVersion + " 可用");
                 }
+                else if (info.IsCurrentNewer)
+                {
+                    // 本地开发版/未发布版本高于 GitHub Release，不应误报为“已是最新”。
+                    UpdateStatus.Text = "当前版本 " + UpdateService.CurrentVersion +
+                                        " 高于公开版 " + info.LatestVersion + "（本地开发版）";
+                    OpenReleaseBtn.Visibility = Visibility.Visible;
+                    if (manual) Host?.ShowToast("当前是未发布的较新版本");
+                }
                 else
                 {
                     UpdateStatus.Text = "已是最新版本（" + UpdateService.CurrentVersion + "）";

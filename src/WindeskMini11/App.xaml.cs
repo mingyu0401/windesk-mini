@@ -407,6 +407,7 @@ namespace WindeskMini11
                 {
                     Log.Write("更新自检: 最新=" + info.LatestVersion +
                               " 有新版=" + info.IsNewer +
+                              " 当前较新=" + info.IsCurrentNewer +
                               " 链接=" + info.ReleaseUrl);
                 }
                 else
